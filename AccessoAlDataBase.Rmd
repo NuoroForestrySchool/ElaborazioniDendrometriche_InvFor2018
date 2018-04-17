@@ -1,6 +1,9 @@
 ---
-title: "Elaborazioni dendrometriche - prima prova "
-output: html_notebook
+title: 'Elaborazioni dendrometriche - prima prova '
+output:
+  html_document:
+    df_print: paged
+  pdf_document: default
 ---
 
 Accesso al DB costruito nelle lezioni precedenti
@@ -14,4 +17,27 @@ DBI::dbListTables(DBconn)
 
 ```
 
+Prima prova di elaborazione
+
+Sintesi base
+```{r}
+# Partiamo dalla vista preparata nel DB
+dbGetQuery(DBconn, 'select * from V_Cavallettamento') %>%
+  group_by(Cod_bosco, AdS, cod_specie) %>%
+  count()
+v_cav <- dbGetQuery(DBconn, 'select * from V_Cavallettamento')
+v_cav %>%
+  group_by(Cod_bosco, AdS, cod_specie) %>%
+  summarise(n= n(), dg = sqrt(mean(d130^2))) %>%
+  mutate(G = n * dg^2 * pi/40000)
+
+```
+
+Ceppaie con più di un pollone
+```{r}
+v_cav %>%
+  group_by(Cod_bosco, AdS, cod_specie, Id_ceppaia) %>%
+  summarise(n_fusti = n()) %>%
+  filter(n_fusti > 1)
+```
 
