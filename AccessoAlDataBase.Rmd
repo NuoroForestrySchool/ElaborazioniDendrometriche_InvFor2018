@@ -1,0 +1,17 @@
+---
+title: "Elaborazioni dendrometriche - prima prova "
+output: html_notebook
+---
+
+Accesso al DB costruito nelle lezioni precedenti
+
+```{r DBaccess}
+library(tidyverse)
+library(RSQLite)
+DBname <- "RilieviDendrometria_v03.sqlite"
+DBconn <- dbConnect(RSQLite::SQLite(), DBname)
+DBI::dbListTables(DBconn)
+
+```
+
+
