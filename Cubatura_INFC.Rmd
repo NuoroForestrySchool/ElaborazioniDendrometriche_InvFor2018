@@ -1,0 +1,64 @@
+---
+title: 'Elaborazioni dendrometriche - cubatura con tavole INFC'
+output:
+  html_document:
+    df_print: paged
+  pdf_document: default
+---
+
+Accesso al DB costruito nelle lezioni precedenti
+
+```{r DBaccess}
+library(tidyverse)
+library(magrittr)
+library(RSQLite)
+DBname <- "RilieviDendrometria_v03.sqlite"
+DBconn <- dbConnect(RSQLite::SQLite(), DBname)
+DBI::dbListTables(DBconn)
+
+```
+
+Prima prova di elaborazione
+
+Sintesi base
+```{r}
+# Partiamo dalla vista preparata nel DB
+dbGetQuery(DBconn, 'select * from V_Cavallettamento') %>%
+  group_by(Cod_bosco, AdS, cod_specie) %>%
+  count()
+v_cav <- dbGetQuery(DBconn, 'select * from V_Cavallettamento')
+v_cav %>%
+  group_by(Cod_bosco, AdS, cod_specie) %>%
+  summarise(n= n(), dg = sqrt(mean(d130^2))) %>%
+  mutate(G = n * dg^2 * pi/40000)
+
+```
+
+Cubatura con tavole INFC
+
+```{r}
+# Funzione che converte un fattore nel vettore dei corrispondenti livelli
+#  (quindi in un vettore di stringhe 'chr', "character")
+factor2chr <- function(x) levels(x)[x]
+
+
+library(ForIT)
+#Elenco delle SPECIE e dei corrispondenti codici
+INFCstats %$% 
+  unique(data.frame(spg = factor2chr(spg), specie = factor2chr(specie))) %>%
+  mutate(rownames = NULL)
+
+
+# a list of different species
+species <- rep(c('Abal','Piab'),2)
+dbh <- c(10,41,20,30)
+heigths <- c(12,14,13,15)
+frequences <- c(2,6,5,4)
+data.frame(species, dbh, heigths, frequences)
+# single-tree estimates
+INFCvpe(species, dbh, heigths, mod='v', frequences, aggr=FALSE)
+# estimates aggregated at species level
+INFCvpe(species, dbh, heigths, mod='v', frequences, aggr=TRUE)
+
+```
+
