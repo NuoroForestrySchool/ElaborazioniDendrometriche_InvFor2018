@@ -1,0 +1,86 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE rflow [
+<!ENTITY lt "&#38;#60;">
+<!ENTITY gt "&#62;">
+<!ENTITY amp "&#38;#38;">
+<!ENTITY apos "&#39;">
+<!ENTITY quot "&#34;">
+]>
+<rflow>
+	<graph version="0.8" width="1598" height="597" locationtype="a" offsetx="0" offsety="0">
+		<setting>
+			<entry key="USE_GRID">true</entry>
+			<entry key="FOLDER">ElaborazioniDendrometriche2</entry>
+			<entry key="GRID_DISTANCE2">10</entry>
+		</setting>
+<properties>
+<v key="packages"/>
+</properties>
+		<node id="0" date="1525188761145" uid="81401a255d30ef40" x="530" y="230">
+			<command># Funzione che converte un fattore nel vettore dei corrispondenti livelli
+#  (quindi in un vettore di stringhe &apos;chr&apos;, &quot;character&quot;)
+factor2chr &lt;- function(x) levels(x)[x]
+
+
+library(ForIT)
+#Elenco delle SPECIE e dei corrispondenti codici
+INFCstats %$% 
+unique(data.frame(spg = factor2chr(spg), specie = factor2chr(specie))) %&gt;%
+mutate(rownames = NULL)
+
+
+# a list of different species
+species &lt;- rep(c(&apos;Abal&apos;,&apos;Piab&apos;),2)
+dbh &lt;- c(10,41,20,30)
+heigths &lt;- c(12,14,13,15)
+frequences &lt;- c(2,6,5,4)
+data.frame(species, dbh, heigths, frequences)
+# single-tree estimates
+INFCvpe(species, dbh, heigths, mod=&apos;v&apos;, frequences, aggr=FALSE)
+# estimates aggregated at species level
+INFCvpe(species, dbh, heigths, mod=&apos;v&apos;, frequences, aggr=TRUE)</command>
+			<property title="Cubatura con tavole INFC" shape="SUMMARY"/>
+			<option type="com.ef_prime.rflow.node.base.FreeNodeModel"/>
+		</node>
+		<node id="1" date="1525188278561" uid="de14badf61b5b50c" x="160" y="230">
+			<command># Access to DataBas
+library(RSQLite)
+DBname &lt;- &quot;../RilieviDendrometria_v03.sqlite&quot;
+DBconn &lt;- dbConnect(RSQLite::SQLite(), DBname)
+DBI::dbListTables(DBconn)
+
+</command>
+			<property title="Access to DataBase" shape="INOUT"/>
+			<option type="com.ef_prime.rflow.node.base.FreeNodeModel"/>
+		</node>
+		<node id="2" date="1525188452841" uid="611c88320c7c49a4" x="110" y="60">
+			<command>library(tidyverse)
+library(magrittr)
+
+</command>
+			<property title="SetUp" shape="STAR"/>
+			<option type="com.ef_prime.rflow.node.base.FreeNodeModel"/>
+		</node>
+		<node id="3" date="1525188635183" uid="85e67f53a5bd92e1" x="370" y="100">
+			<command># Partiamo dalla vista preparata nel DB
+dbGetQuery(DBconn, &apos;select * from V_Cavallettamento&apos;) %&gt;%
+group_by(Cod_bosco, AdS, cod_specie) %&gt;%
+count()
+v_cav &lt;- dbGetQuery(DBconn, &apos;select * from V_Cavallettamento&apos;)
+v_cav %&gt;%
+group_by(Cod_bosco, AdS, cod_specie) %&gt;%
+summarise(n= n(), dg = sqrt(mean(d130^2))) %&gt;%
+mutate(G = n * dg^2 * pi/40000)</command>
+			<property title="Prime elaborazioni" shape="SUMMARY"/>
+			<option type="com.ef_prime.rflow.node.base.FreeNodeModel"/>
+		</node>
+		<edge from="2" to="1"/>
+		<edge from="1" to="3"/>
+		<edge from="1" to="0"/>
+	</graph>
+	<task>
+		<taskgroup>
+			<taskproperty/>
+		</taskgroup>
+	</task>
+</rflow>

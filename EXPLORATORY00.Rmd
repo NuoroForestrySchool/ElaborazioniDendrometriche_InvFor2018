@@ -1,0 +1,122 @@
+---
+title: 'Processing forest inventory measurements'
+output:
+  html_document:
+    df_print: paged
+  pdf_document: default
+---
+
+# Setup and connect to DB
+
+```{r DBaccess}
+library(tidyverse)
+library(magrittr)
+library(RSQLite)
+DBname <- "RilieviDendrometria_v03.sqlite"
+DBconn <- dbConnect(SQLite(), DBname)
+dbListTables(DBconn)
+v_cav <- dbGetQuery(DBconn, 'select * from V_Cavallettamento')
+v_heigths <- 
+  dbGetQuery(DBconn, 'select * from V_Altezze') %>%
+  mutate(h_dendrometrica = as.numeric(h_dendrometrica))
+dbDisconnect(DBconn)
+```
+
+# Synthesis tables
+COULD not find the 'pivot function', is it special for EXPLORATORY?
+
+```{# r}
+v_cav %>%
+  pivot(Cod_bosco + AdS ~ sp, value = Id_ceppaia, fun.aggregate = length)
+```
+
+# Initial stand tables
+
+```{r}
+v_cav %>%
+  group_by(Cod_bosco, AdS, cod_specie) %>%
+  summarise(n= n(), dg = sqrt(mean(d130^2))) %>%
+  mutate(G = n * dg^2 * pi/40000)
+
+```
+
+# Estimation of dbh-heigth models
+
+```{r}
+h_mods <- v_heigths %>%
+  group_by(Cod_bosco, AdS, cod_specie) %>%
+    do(fit = lm(h_dendrometrica ~ log(d130), .))
+
+v_heigths %>%
+  group_by(Cod_bosco, AdS, cod_specie) %>%
+  nest() %>%
+  inner_join(h_mods, .) %>%
+  mutate(avg_h = list(augment(fit, newdata = data))) %>%
+  unnest(avg_h) %>%
+  rename(avg_h = .fitted, avg_h.se = .se.fit) %>%
+  ggplot() +
+  geom_point(aes(d130, h_dendrometrica)) +
+  geom_line(aes(d130, avg_h)) +
+  facet_grid(Cod_bosco + AdS + cod_specie ~ ., scales = "free")
+
+```
+
+# Stand tables summary by dbh class
+and Estimation of average heigths (by class)
+
+```{r}
+library(broom)
+acl <- 3 # dbh class intervals width
+
+standTables1 <- v_cav %>%
+  mutate(dbh = d130, d130 = acl*floor(.5 + d130/acl)) %>%
+  group_by(Cod_bosco, AdS, cod_specie, d130) %>%
+  summarise(frq = n()) %>%
+  nest() %>%
+  inner_join(h_mods, .) %>%
+  mutate(avg_h = list(augment(fit, newdata = data))) %>%
+  unnest(avg_h) %>%
+  rename(avg_h = .fitted, avg_h.se = .se.fit)
+  
+
+```
+
+
+# Estimation of wood resource using INFC volume (tables) functions
+[Species matching
+Quil for QUEILE
+Piab for CEDRUS]
+
+```{r}
+# Funzione che converte un fattore nel vettore dei corrispondenti livelli
+#  (quindi in un vettore di stringhe 'chr', "character")
+factor2chr <- function(x) levels(x)[x]
+
+
+library(ForIT)
+#Elenco delle SPECIE e dei corrispondenti codici
+INFCspecies <- INFCstats %$% 
+  unique(data.frame(spg = factor2chr(spg), specie = factor2chr(specie))) %>%
+  mutate(rownames = NULL)
+
+lkup <- setNames(c('Quil', 'Piab'), c('QUEILE','CEDRUS'))
+
+standTables2 <- standTables1 %>%
+  group_by(Cod_bosco, AdS) %>%
+  nest() %>%
+  mutate(v = map(data, 
+                 function(x) as.data.frame(x) %$%
+                   INFCvpe(lkup[cod_specie], d130 , avg_h, 
+                           mod='v', frq, aggr=FALSE)[['mainData']])) %>%
+  unnest()
+
+standTables2 %T>% 
+  {if (any(.$in.range == 'n')) warning("There are OUTofRANGE values")} %<>%
+  filter(!in.range == 'n') %>%
+  group_by(Cod_bosco, AdS, cod_specie) %>%
+  summarise(n= sum(frq), dg = sqrt(mean(d130^2)), Vol = sum(T_0)/10000) %>%
+  mutate(G = n * dg^2 * pi/40000) %>%
+  select(Cod_bosco, AdS, cod_specie, n, dg, G, Vol)
+
+```
+
