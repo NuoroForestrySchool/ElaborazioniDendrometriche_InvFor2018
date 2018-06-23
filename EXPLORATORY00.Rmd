@@ -43,6 +43,7 @@ v_cav %>%
 # Estimation of dbh-heigth models
 
 ```{r}
+library(broom)
 h_mods <- v_heigths %>%
   group_by(Cod_bosco, AdS, cod_specie) %>%
     do(fit = lm(h_dendrometrica ~ log(d130), .))
@@ -65,7 +66,6 @@ v_heigths %>%
 and Estimation of average heigths (by class)
 
 ```{r}
-library(broom)
 acl <- 3 # dbh class intervals width
 
 standTables1 <- v_cav %>%
